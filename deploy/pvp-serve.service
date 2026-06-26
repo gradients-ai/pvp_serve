@@ -1,0 +1,22 @@
+[Unit]
+Description=pvp_serve play/chat API
+After=network-online.target champion-sglang.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/pvp_serve
+Environment=PATH=/opt/pvp_serve/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=GOD_REPO_PATH=/opt/pvp_serve/god
+Environment=PVP_AGENT_KIND=llm
+Environment=PVP_SGLANG_BASE_URL=http://127.0.0.1:30000/v1
+Environment=PVP_INFERENCE_MODEL=champion
+Environment=PVP_CORS_ORIGINS=https://gradients.io,https://www.gradients.io
+Environment=PVP_HOST=127.0.0.1
+Environment=PVP_PORT=8000
+ExecStart=/opt/pvp_serve/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

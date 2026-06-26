@@ -12,6 +12,7 @@ set -euo pipefail
 
 MODEL="${PVP_MODEL_REPO:-gradients-io-tournaments/tournament-tourn_358aca49563e214e_20260622-ac97eed9-69ff-4355-a012-2a9feaf3fd5f-5EEaxgnm}"
 SERVED_NAME="${PVP_INFERENCE_MODEL:-champion}"
+HOST="${SGLANG_HOST:-0.0.0.0}"
 PORT="${SGLANG_PORT:-30000}"
 SEED="${PVP_SEED:-0}"
 TP="${SGLANG_TENSOR_PARALLEL_SIZE:-1}"
@@ -26,7 +27,7 @@ export HF_TOKEN="${HF_TOKEN:-}"
 exec python3 -m sglang.launch_server \
   --model-path "$MODEL" \
   --served-model-name "$SERVED_NAME" \
-  --host 0.0.0.0 --port "$PORT" \
+  --host "$HOST" --port "$PORT" \
   --tensor-parallel-size "$TP" \
   --dtype "$DTYPE" \
   --enable-deterministic-inference --random-seed "$SEED" \

@@ -1,0 +1,20 @@
+[Unit]
+Description=Champion SGLang inference server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/pvp_serve
+Environment=PATH=/opt/pvp_serve/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=SGLANG_HOST=127.0.0.1
+Environment=SGLANG_PORT=30000
+Environment=PVP_MODEL_REPO=/opt/champion
+Environment=PVP_INFERENCE_MODEL=champion
+ExecStart=/opt/pvp_serve/scripts/serve_sglang.sh
+Restart=always
+RestartSec=10
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
