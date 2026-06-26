@@ -58,6 +58,9 @@ class CreateSessionRequest(BaseModel):
     game: GameId
     humanSeat: Seat | Literal["random"] = "random"
     model: str | None = None
+    # Stable per-player id (browser localStorage). Lets the champion carry its
+    # long-term notes about this opponent across games, like the eval matchup does.
+    playerId: str | None = None
 
 
 class MoveRequest(BaseModel):

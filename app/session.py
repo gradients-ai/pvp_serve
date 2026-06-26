@@ -85,6 +85,7 @@ class GameSession:
     state: Any
     rng: np.random.RandomState
     model: str
+    player_id: str | None = None
     memories: dict[MemoryArea, SlotMemory] | None = None
     bot: LLMBot | None = None
     ply: int = 0
@@ -126,11 +127,37 @@ store = SessionStore(settings.session_ttl_seconds)
 
 _SESSION_SEED_RNG = np.random.RandomState()  # varies game variants across sessions
 
+# Long-term memory persisted across a player's games, keyed by (playerId, game).
+# In eval, long-term memory survives across the games of a matchup; here a
+# returning player IS the opponent, so we carry the champion's notes between
+# their games. In-memory (resets on server restart); good enough for now.
+_LONG_TERM_STORE: dict[str, dict[int, str]] = {}
+
+
+def _lt_key(player_id: str, game_id: str) -> str:
+    return f"{player_id}:{game_id}"
+
+
+def _load_long_term(session: GameSession, player_id: str | None) -> None:
+    if not (player_id and session.memories):
+        return
+    saved = _LONG_TERM_STORE.get(_lt_key(player_id, session.game_id))
+    if saved:
+        session.memories[MemoryArea.LONG_TERM].slots.update(saved)
+
+
+def _save_long_term(session: GameSession) -> None:
+    if not (session.player_id and session.memories):
+        return
+    _LONG_TERM_STORE[_lt_key(session.player_id, session.game_id)] = dict(
+        session.memories[MemoryArea.LONG_TERM].slots
+    )
+
 
 # --- driver ------------------------------------------------------------------
 
 
-def create_session(game_id: str, human_seat_opt: int | str, model: str | None) -> PlaySession:
+def create_session(game_id: str, human_seat_opt: int | str, model: str | None, player_id: str | None = None) -> PlaySession:
     env = EnvironmentName(game_id)
     agent_cls = _AGENT_REGISTRY[env]
     agent = agent_cls()
@@ -156,14 +183,18 @@ def create_session(game_id: str, human_seat_opt: int | str, model: str | None) -
         state=state,
         rng=rng,
         model=model_name if settings.is_llm else f"{model_name} (random)",
+        player_id=player_id,
     )
 
     if settings.is_llm:
         session.memories = default_memories()
         session.bot = _make_bot(game, agent_seat, agent, session.memories)
-        session.bot.restart_at(state)
+        session.bot.restart_at(state)  # resets working memory; long-term loaded next
+        _load_long_term(session, player_id)
 
     _advance(session)
+    if session.finished or session.state.is_terminal():
+        _on_game_end(session)
     store.put(session)
     return PlaySession(
         sessionId=session.id,
@@ -184,8 +215,8 @@ def apply_human_move(session: GameSession, action_id: int) -> GameView:
     session.last_agent_turn = None
     _apply(session, session.human_seat, action_id)
     _advance(session)
-    if (session.finished or state.is_terminal()) and session.bot is not None:
-        _reflect(session)
+    if session.finished or state.is_terminal():
+        _on_game_end(session)
     return build_view(session)
 
 
@@ -272,6 +303,13 @@ def _forfeit(session: GameSession, forfeiting_seat: int) -> None:
     returns[forfeiting_seat] = g.min_utility()
     session.forfeit_returns = returns
     session.finished = True
+
+
+def _on_game_end(session: GameSession) -> None:
+    """At terminal: let the champion consolidate long-term notes, then persist them."""
+    if session.bot is not None:
+        _reflect(session)
+    _save_long_term(session)
 
 
 def _reflect(session: GameSession) -> None:

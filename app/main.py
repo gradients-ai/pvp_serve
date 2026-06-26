@@ -44,7 +44,7 @@ async def health() -> dict:
 async def create_session(req: CreateSessionRequest) -> PlaySession:
     async with _lock:
         try:
-            return driver.create_session(req.game, req.humanSeat, req.model)
+            return driver.create_session(req.game, req.humanSeat, req.model, req.playerId)
         except KeyError:
             raise HTTPException(status_code=400, detail=f"unknown game {req.game!r}")
 
