@@ -11,8 +11,8 @@ Wants=network-online.target
 ExecStartPre=-/usr/bin/docker rm -f champion-sglang
 ExecStart=/usr/bin/docker run --rm --name champion-sglang --gpus all \
   -p 127.0.0.1:30000:30000 \
-  -v /opt/champion:/opt/champion:ro \
-  -v /opt/hf_cache:/root/.cache/huggingface \
+  -v /ephemeral/champion:/opt/champion:ro \
+  -v /ephemeral/hf_cache:/root/.cache/huggingface \
   lmsysorg/sglang:latest \
   python3 -m sglang.launch_server \
     --model-path /opt/champion --served-model-name champion \
