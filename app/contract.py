@@ -62,3 +62,18 @@ class CreateSessionRequest(BaseModel):
 
 class MoveRequest(BaseModel):
     actionId: int
+
+
+# --- general chat -----------------------------------------------------------
+
+
+class ChatMessageIn(BaseModel):
+    role: Literal["system", "user", "assistant"]
+    content: str
+
+
+class ChatRequest(BaseModel):
+    messages: list[ChatMessageIn]
+    # Optional per-request overrides; fall back to server defaults when unset.
+    temperature: float | None = None
+    maxTokens: int | None = None

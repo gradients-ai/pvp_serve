@@ -22,6 +22,18 @@ class Settings:
     )
     # How long a session may sit idle before it is evicted.
     session_ttl_seconds: int = field(default_factory=lambda: int(os.environ.get("PVP_SESSION_TTL_SECONDS", "3600")))
+    # --- general chat with the champion ---
+    chat_temperature: float = field(default_factory=lambda: float(os.environ.get("PVP_CHAT_TEMPERATURE", "0.7")))
+    chat_max_tokens: int = field(default_factory=lambda: int(os.environ.get("PVP_CHAT_MAX_TOKENS", "1024")))
+    chat_system_prompt: str = field(
+        default_factory=lambda: os.environ.get(
+            "PVP_CHAT_SYSTEM_PROMPT",
+            "You are the Gradients champion — the model that won the latest Bittensor subnet 56 "
+            "environment tournament. Be helpful, direct, and concise.",
+        )
+    )
+    # Max messages accepted in a single chat request (guards context + abuse).
+    chat_max_messages: int = field(default_factory=lambda: int(os.environ.get("PVP_CHAT_MAX_MESSAGES", "40")))
 
     @property
     def is_llm(self) -> bool:

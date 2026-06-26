@@ -14,9 +14,11 @@ import asyncio
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 from app.config import settings
-from app.contract import CreateSessionRequest, GameView, MoveRequest, PlaySession
+from app.contract import ChatRequest, CreateSessionRequest, GameView, MoveRequest, PlaySession
+from app import chat as chat_proxy
 from app import session as driver
 
 app = FastAPI(title="pvp_serve", summary="Play the Gradients champion at OpenSpiel games")
@@ -66,3 +68,22 @@ async def submit_move(session_id: str, req: MoveRequest) -> GameView:
             return driver.apply_human_move(s, req.actionId)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/chat")
+async def chat(req: ChatRequest) -> StreamingResponse:
+    """Stream a general chat reply from the champion as Server-Sent Events.
+
+    Independent of the game harness — does not take the turn lock.
+    """
+    if not settings.is_llm:
+        raise HTTPException(status_code=503, detail="chat needs a served model (PVP_AGENT_KIND=llm)")
+    if not req.messages:
+        raise HTTPException(status_code=400, detail="messages must be non-empty")
+    if len(req.messages) > settings.chat_max_messages:
+        raise HTTPException(status_code=400, detail=f"too many messages (max {settings.chat_max_messages})")
+    return StreamingResponse(
+        chat_proxy.stream_chat(req),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
