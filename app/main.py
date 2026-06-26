@@ -70,6 +70,16 @@ async def submit_move(session_id: str, req: MoveRequest) -> GameView:
             raise HTTPException(status_code=400, detail=str(exc))
 
 
+@app.post("/session/{session_id}/advance", response_model=GameView)
+async def advance(session_id: str) -> GameView:
+    """Run the champion's reply after a human move (phase 2 of a turn)."""
+    async with _lock:
+        s = driver.store.get(session_id)
+        if s is None:
+            raise HTTPException(status_code=404, detail=f"unknown session {session_id}")
+        return driver.advance_agent(s)
+
+
 @app.post("/chat")
 async def chat(req: ChatRequest) -> StreamingResponse:
     """Stream a general chat reply from the champion as Server-Sent Events.

@@ -192,7 +192,7 @@ def create_session(game_id: str, human_seat_opt: int | str, model: str | None, p
         session.bot.restart_at(state)  # resets working memory; long-term loaded next
         _load_long_term(session, player_id)
 
-    _advance(session)
+    _advance_full(session)
     if session.finished or session.state.is_terminal():
         _on_game_end(session)
     store.put(session)
@@ -206,6 +206,9 @@ def create_session(game_id: str, human_seat_opt: int | str, model: str | None, p
 
 
 def apply_human_move(session: GameSession, action_id: int) -> GameView:
+    """Phase 1 of a turn: apply ONLY the human's move (+ any chance), do NOT run
+    the agent. Returns immediately so the UI can show the human's move before the
+    champion 'thinks'. The client then calls advance_agent() for the reply."""
     state = session.state
     if session.finished or state.is_terminal() or state.current_player() != session.human_seat:
         return build_view(session)
@@ -214,13 +217,31 @@ def apply_human_move(session: GameSession, action_id: int) -> GameView:
 
     session.last_agent_turn = None
     _apply(session, session.human_seat, action_id)
-    _advance(session)
+    _advance_through_chance(session)
     if session.finished or state.is_terminal():
         _on_game_end(session)
     return build_view(session)
 
 
-def _advance(session: GameSession) -> None:
+def advance_agent(session: GameSession) -> GameView:
+    """Phase 2 of a turn: run the champion's turn(s) (+ chance) until it's the
+    human's turn again or the game ends. No-op if already the human's turn."""
+    state = session.state
+    if not (session.finished or state.is_terminal() or state.current_player() == session.human_seat):
+        _advance_full(session)
+        if session.finished or state.is_terminal():
+            _on_game_end(session)
+    return build_view(session)
+
+
+def _advance_through_chance(session: GameSession) -> None:
+    """Apply chance nodes until a player is to move or the game ends (no agent move)."""
+    state = session.state
+    while not (session.finished or state.is_terminal()) and state.is_chance_node():
+        _apply_chance(session)
+
+
+def _advance_full(session: GameSession) -> None:
     """Advance through chance nodes and agent turns until the human moves or the game ends."""
     state = session.state
     while True:
@@ -352,22 +373,31 @@ def _legal_actions(session: GameSession) -> list[LegalAction]:
     seat = session.human_seat
     out: list[LegalAction] = []
     for a in state.legal_actions(seat):
-        out.append(LegalAction(id=a, label=_action_label(session, seat, a), meta=_action_meta(session.game_id, a)))
+        label = _action_label(session, seat, a)
+        out.append(LegalAction(id=a, label=label, meta=_action_meta(session, seat, a, label)))
     return out
 
 
-def _action_meta(game_id: str, action: int) -> dict[str, Any] | None:
-    if game_id == EnvironmentName.LIARS_DICE.value:
+def _action_meta(session: GameSession, seat: int, action: int, label: str) -> dict[str, Any] | None:
+    gid = session.game_id
+    if gid == EnvironmentName.LIARS_DICE.value:
         return sv.liars_dice_action_meta(action)
-    if game_id == EnvironmentName.OTHELLO.value:
+    if gid == EnvironmentName.OTHELLO.value:
         return sv.othello_action_meta(action)
+    if gid == EnvironmentName.GOOFSPIEL.value:
+        return sv.goofspiel_action_meta(session.state, seat, action)
+    if gid == EnvironmentName.LEDUC_POKER.value:
+        return sv.leduc_action_meta(label)
+    if gid == EnvironmentName.GIN_RUMMY.value:
+        return sv.gin_action_meta(label)
     return None
 
 
 def _structured(session: GameSession) -> Any:
-    if session.game_id == EnvironmentName.OTHELLO.value:
+    gid = session.game_id
+    if gid == EnvironmentName.OTHELLO.value:
         return sv.othello_structured(session.state, session.human_seat, session.finished)
-    if session.game_id == EnvironmentName.LIARS_DICE.value:
+    if gid == EnvironmentName.LIARS_DICE.value:
         return sv.liars_dice_structured(
             session.state,
             session.human_seat,
@@ -375,6 +405,15 @@ def _structured(session: GameSession) -> Any:
             standing_bid=session.standing_bid,
             challenge=session.challenge,
         )
+    try:
+        if gid == EnvironmentName.LEDUC_POKER.value:
+            return sv.leduc_poker_structured(session.state, session.human_seat)
+        if gid == EnvironmentName.GOOFSPIEL.value:
+            return sv.goofspiel_structured(session.state, session.human_seat)
+        if gid == EnvironmentName.GIN_RUMMY.value:
+            return sv.gin_rummy_structured(session.state, session.human_seat)
+    except Exception:  # noqa: BLE001 — never break the view on a parse hiccup; UI falls back to observation
+        return None
     return None
 
 
