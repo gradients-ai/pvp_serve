@@ -18,6 +18,11 @@ SEED="${PVP_SEED:-0}"
 TP="${SGLANG_TENSOR_PARALLEL_SIZE:-1}"
 DTYPE="${SGLANG_DTYPE:-float16}"
 PARSER="${SGLANG_TOOL_CALL_PARSER:-qwen25}"
+# Deterministic inference is off by default: its triton attention kernel needs
+# more shared memory per block than Ada GPUs (e.g. L40) provide, so it OOMs.
+# Eval uses it for reproducibility; human play/chat does not need it.
+DET_FLAGS=""
+[[ "${SGLANG_DETERMINISTIC:-0}" == "1" ]] && DET_FLAGS="--enable-deterministic-inference --random-seed $SEED"
 
 if [[ -z "${HF_TOKEN:-}" ]]; then
   echo "WARNING: HF_TOKEN not set — the champion repo is gated and will fail to download." >&2
@@ -30,5 +35,5 @@ exec python3 -m sglang.launch_server \
   --host "$HOST" --port "$PORT" \
   --tensor-parallel-size "$TP" \
   --dtype "$DTYPE" \
-  --enable-deterministic-inference --random-seed "$SEED" \
+  $DET_FLAGS \
   --tool-call-parser "$PARSER"
