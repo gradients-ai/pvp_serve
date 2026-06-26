@@ -1,17 +1,26 @@
 [Unit]
-Description=Champion SGLang inference server
-After=network-online.target
+Description=Champion SGLang inference server (Docker)
+After=network-online.target docker.service
+Requires=docker.service
 Wants=network-online.target
 
 [Service]
-Type=simple
-WorkingDirectory=/opt/pvp_serve
-Environment=PATH=/opt/pvp_serve/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-Environment=SGLANG_HOST=127.0.0.1
-Environment=SGLANG_PORT=30000
-Environment=PVP_MODEL_REPO=/opt/champion
-Environment=PVP_INFERENCE_MODEL=champion
-ExecStart=/opt/pvp_serve/scripts/serve_sglang.sh
+# SGLang runs in the lmsysorg/sglang image: its bundled cuda-compat lets the
+# CUDA-13 runtime work on the host's 535 driver (forward-compat on the L40).
+# Serves the pre-merged champion full weights at /opt/champion on loopback :30000.
+ExecStartPre=-/usr/bin/docker rm -f champion-sglang
+ExecStart=/usr/bin/docker run --rm --name champion-sglang --gpus all \
+  -p 127.0.0.1:30000:30000 \
+  -v /opt/champion:/opt/champion:ro \
+  -v /opt/hf_cache:/root/.cache/huggingface \
+  lmsysorg/sglang:latest \
+  python3 -m sglang.launch_server \
+    --model-path /opt/champion --served-model-name champion \
+    --host 0.0.0.0 --port 30000 \
+    --tensor-parallel-size 1 --dtype float16 \
+    --enable-deterministic-inference --random-seed 0 \
+    --tool-call-parser qwen25
+ExecStop=/usr/bin/docker stop champion-sglang
 Restart=always
 RestartSec=10
 TimeoutStartSec=0
