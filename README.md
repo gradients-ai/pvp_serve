@@ -18,7 +18,12 @@ Implements the `GameConnector` contract from `gradients-web`
 | POST | `/session` | `{ game, humanSeat, model? }` | `PlaySession` |
 | GET | `/session/{id}` | — | `GameView` |
 | POST | `/session/{id}/move` | `{ actionId }` | `GameView` |
+| POST | `/chat` | `{ messages, temperature?, maxTokens? }` | SSE stream (`data: {delta}` … `[DONE]`) |
 | GET | `/health` | — | status |
+
+`/chat` is a general (non-game) streaming conversation with the champion — a thin
+async proxy in front of SGLang, so the inference server stays off the public
+internet. The gradients-web `/chat` page consumes it.
 
 Games: `liars_dice`, `othello` (rich renderers — server emits a `structured`
 view), and `leduc_poker`, `goofspiel`, `gin_rummy` (generic renderer — observation
