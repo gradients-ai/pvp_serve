@@ -1,0 +1,4 @@
+[submodule "god"]
+	path = god
+	url = git@github.com:gradients-ai/G.O.D.git
+	branch = main

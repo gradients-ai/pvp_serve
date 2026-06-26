@@ -1,0 +1,24 @@
+[project]
+name = "pvp-serve"
+version = "0.1.0"
+description = "Human-vs-champion play server for the Gradients (G.O.D) PvP env games"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110,<0.116",
+    "uvicorn>=0.30,<0.35",
+    "openai>=1.30",
+    "pydantic>=2.5",
+    "pyyaml>=6.0",
+    "numpy>=1.26",
+    # open_spiel / pyspiel is NOT on PyPI for all platforms — install separately,
+    # e.g. `pip install open_spiel` where wheels exist, or build from source.
+    # core.pvp (imported from the G.O.D submodule) needs it at runtime.
+]
+
+[project.optional-dependencies]
+# Only needed if you want tokenizer-accurate memory-slot budgeting; the server
+# falls back to a whitespace counter without it.
+tokenizer = ["transformers>=4.40"]
+
+[tool.setuptools]
+packages = ["app"]
